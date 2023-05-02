@@ -1,0 +1,154 @@
+Solucion aplicada
+
+Update Class Custom.HMS.JS.PAAdm.Edit
+-----------------------------------------------------
+Add the following code at the bottom:
+
+/* Mejora FM-0094 ----> Inicio */
+/* 	Action over the button id="update1" */
+/* Validate Pre-Admition for a patient on the same day and speciality */
+function UpdateAll() {
+	if (!validatePreAdmissionRegistered()) return
+	if (evtTimer) {
+		setTimeout('UpdateAll()',200);
+	} else {
+		if (!CheckInvalidFields())  { return false; }
+		if ((websys_getMainFrame())&&(websys_getMainFrame().frames["upper"])) {
+			var frm = document.forms["fPAAdm_Edit"];
+			frm.target = "_parent";
+		}
+		var objROId=document.getElementById("RoyalID");
+		if (objROId) {
+			if (objROId.value!="") {
+				var objROStat=document.getElementById("RoyalStatus");
+				var ROData="";
+				var Res="";
+				var EpID=document.getElementById("EpisodeID");
+				var objROData=document.getElementById("RoyalOrderData");
+				if((objROData)&&(objROData.value!="")) ROData=objROData.value;
+				var ValidPeriod="";
+				var ValidPeriodUnit="";
+				var InpValidPeriod="";
+				var InpValidPeriodUnits="";
+				if(ROData!=""){
+					var lu = ROData.split("^");
+					if(lu[0]!="") ValidPeriod=lu[0];
+					if(lu[1]!="") ValidPeriodUnit=lu[1];
+					if(lu[2]!="") InpValidPeriod=lu[2];
+					if(lu[3]!="") InpValidPeriodUnits=lu[3];
+				}
+				if (objROStat) {
+					if ((objROStat.value=="AI")&&(AdmType=="O")&&(ValidPeriod!="")&&(ValidPeriodUnit!="")) {
+						if((EpID)&&(EpID.value!="")) Res=tkMakeServerCall("web.PAPersonRoyalOrder","CheckDiffEpisTypeForRoyalOrder",EpID.value,objROId.value);
+					}
+					else if ((objROStat.value=="AI")&&(AdmType=="O")) {
+						alert(t['RONoOutEpisode']);
+						return false;
+					}
+					if ((objROStat.value=="AO")&&(AdmType=="I")&&(InpValidPeriod!="")&&(InpValidPeriodUnits!="")) {
+						if((EpID)&&(EpID.value!="")) Res=tkMakeServerCall("web.PAPersonRoyalOrder","CheckDiffEpisTypeForRoyalOrder",EpID.value,objROId.value);
+					}
+					else if ((objROStat.value=="AO")&&(AdmType=="I")) {
+						alert(t['RONoInEpisode']);
+						return false;
+					}
+				}
+			}
+		}
+		var objSD=document.getElementById("PAADMFlaggedPatient");
+		var objOpDt=document.getElementById("PAADM2OperationDate");
+		var objEpDt=document.getElementById("PAADMAdmDate");
+		if ((objSD)&&(objOpDt)&&(objEpDt)) {
+			if ((objSD.value=="Yes")&&(objEpDt.value!=objOpDt.value)) {
+				alert(t['SAME_DAYOP']);
+				return false;
+			}
+		}
+		if (!CheckMandatoryFields()) { return ;}
+		CheckInvalid();
+		var objCV=document.getElementById("CrossVal");
+		if (objCV) objCV.value=1;
+		setCrossValParams();
+		CrossVal(0);
+		var objCV=document.getElementById("CrossVal");
+		if ((objCV)&&(objCV.value==2)) return false;
+		return update1_click();
+	}
+}
+	
+function validatePreAdmissionRegistered()
+{
+	var preAdmissionRegistered=''
+	var preAdmitionData = ''
+	var regestryDate = document.getElementById('PAADMAdmDate').value
+	var PatientID = document.getElementById('PatientID').value
+	var regestrySpeciality = document.getElementById('CTLOCDesc').value
+	if(regestryDate != '' && PatientID != '' && regestrySpeciality != ''){
+		preAdmitionData = regestryDate + '^' + PatientID + '^' + regestrySpeciality
+		preAdmissionRegistered=tkMakeServerCall("Custom.HMS.Misc.web.PAAdm","GetPatientEpisodesByDate",preAdmitionData)
+	}
+	if(preAdmissionRegistered !== ''){
+		if(!confirm(preAdmissionRegistered)){ 
+			return false
+		}
+	}
+	return true
+}
+/* Mejora FM-0094 ----> Fin */
+
+Add: Class Custom.HMS.Misc.web.PAAdm
+-------------------------------------------------------
+Include EnsUtil
+
+Class Custom.HMS.Misc.web.PAAdm Extends %RegisteredObject [ Not ProcedureBlock ]
+{
+
+/// ////////////////////////////////////////////////////////////////
+/// Mejora FM-0094 (Abril 2023)
+/// Params: preAdmitionData (string separated by "^")
+/// 		preAdmitionData(1) = regestryDate ['dd/MM/yyyy']
+/// 		preAdmitionData(2) = patientID
+/// 		preAdmitionData(3) = regestrySpeciality
+/// /////////////////////////////////////////////////////////////////
+ClassMethod GetPatientEpisodesByDate(preAdmitionData) As %String
+{
+		Set tSC = ""
+		
+		Set regestryDate = $Piece(preAdmitionData,"^",1)
+		Set patientID = $Piece(preAdmitionData,"^",2)
+		Set regestrySpeciality = $Piece(preAdmitionData,"^",3)
+		
+		
+		&sql(declare CPAADM cursor for
+  			select
+			PAADM_RowID
+			into :rowid
+			from sqluser.PA_Adm 
+			where 
+			PAADM_VisitStatus = 'P'
+			and PAADM_PAPMI_DR = :patientID
+			and PAADM_AdmDate = TO_DATE(:regestryDate, 'DD/MM/YYYY')
+		)
+		
+		&sql(open CPAADM)
+			quit:(SQLCODE'=0)
+ 		&sql(fetch CPAADM)
+ 		
+ 		set i = 1
+ 		while (SQLCODE = 0) {
+	 		Set PAADMADMNo = $Piece($Get(^PAADM(rowid)),"^",81)
+	 		Set PAADMDepCodeDR = $Piece($Get(^PAADM(rowid)),"^",4)
+	 		Set specility = $Piece($Get(^CTLOC(PAADMDepCodeDR)),"^",2)
+	 		if specility = regestrySpeciality
+	 		{ 
+	 			Set tSC = "Ya se encuentra registrada una Pre-Admision para esta fecha y especialidad"_$CHAR(10)_"Episodio: "_PAADMADMNo
+	 			Quit
+	 		} 
+	 		Set i =  i + 1
+	 		&sql(fetch CPAADM)
+ 		}
+ 		&sql(close CPAADM)
+		Quit tSC
+}
+
+}

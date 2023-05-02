@@ -1,0 +1,117 @@
+FM-0069: (4 horas)
+	. Ingresar como Quimico Farmaceutico
+	. En el Tab de Pendiente seleccionamos las recetas quue se desean aceptar
+	. Presionamos el enlance Aceptar
+	
+Datos de paciente:
+
+-----------------------------------------------------------------
+Clase: Custom.HMS.Misc.web.OEOrdItem.cls
+Metodo: ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %Integer
+
+*********************************************************************************************************************
+*                                            Funcion Agregada                                                     *
+*********************************************************************************************************************
+/// ////////////////////////////////////////////////////////////////
+/// Mejora FM-0067 (Feb 2023)
+/// /////////////////////////////////////////////////////////////////
+ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
+{
+	Set tSC = ""
+	Set listRowsID = $LISTFROMSTRING($EXTRACT(rowsID,0, *-1),"^")
+	Set listOfItems = $ListBuild()
+	Set ptr=0
+   	While $LISTNEXT(listRowsID,ptr,value) {
+	   	Set listNode = $piece(value,"-",1)
+	   	Set episode = $piece(listNode,"||",1)
+	   	Set row = $piece(listNode,"||",2)
+	   	Set OEORDAdmDR=$Piece($Get(^OEORD(episode)),"^",1)
+	   	Set PAADMPAPMIDR=$Piece($Get(^PAADM(OEORDAdmDR)),"^",1)
+	   	Set patientRut = $Piece($Get(^PAPER(PAADMPAPMIDR,"ALL")),"^",9)
+	   	Set OEORIItmMastDR=$Piece(^OEORD(episode,"I",row,1),"^",2)
+	   	Set itemID = $piece($Piece(^OEORD(episode,"I",row,1),"^",2),"||",1)
+	   	Set recipeDate = $Piece(^OEORD(episode,"I",row,1),"^",9)
+	   	Set recipeDateFormated = $ZDATE(recipeDate,3)
+	   	Set listOfItemsNewNode = itemID_"^"_recipeDate
+	   	
+	   	&sql(declare C1 cursor for
+	   		select 
+			OEORI_RowId
+			into :rowid 
+			from sqluser.OE_OrdItem 
+			where 
+			OEORI_SttDat = TO_DATE(:recipeDateFormated, 'YYYY-MM-DD')
+			and OEORI_OEORD_ParRef->OEORD_Adm_DR->PAADM_PAPMI_DR->PAPMI_ID = :patientRut
+			and OEORI_ItmMast_DR = :OEORIItmMastDR
+		)
+
+		&sql(open C1)
+			quit:(SQLCODE'=0)
+ 		&sql(fetch C1)
+ 	
+ 		set i = 1
+ 		Set itsOnlyPending = "Y"
+ 		s EstadoConsultado=""
+ 		while (SQLCODE = 0) {
+	 		Set rowPharmacyStatus = $$pharmst^COEOrdItem6(rowid)
+	 		if rowPharmacyStatus '= "P" 
+	 		{
+		 		Set itsOnlyPending = "N"
+				i rowPharmacyStatus = "P" s EstadoConsultado="Pendiente"
+				i rowPharmacyStatus = "A" s EstadoConsultado="Aceptado"
+				i rowPharmacyStatus = "M" s EstadoConsultado="Envasado"
+				i rowPharmacyStatus = "C" s EstadoConsultado="Despachado"
+				i rowPharmacyStatus = "O" s EstadoConsultado="Finalizado"
+				i rowPharmacyStatus = "J" s EstadoConsultado="Retornado"
+				i rowPharmacyStatus = "R" s EstadoConsultado="Rechazado"
+		 		Quit
+	 		}
+	 		Set i =  i + 1
+	 		&sql(fetch C1)
+ 		}
+ 		&sql(close C1)
+	   	
+	   	if itsOnlyPending = "N" Set $List(listOfItems,*+1) = listOfItemsNewNode
+	   	
+	   	set isDuplicated = $ListFind(listOfItems, listOfItemsNewNode)
+	   	if isDuplicated > 0
+	   	{
+		   	if $Find(tSC, $piece(value,"-",2)) = 0 Set tSC = tSC_"● "_$piece(value,"-",2)_" ("_EstadoConsultado_")"_$CHAR(10)
+	   	}
+	   	else
+	   	{
+		   	Set $List(listOfItems,*+1) = listOfItemsNewNode
+	   	}
+   	}
+	Quit tSC
+}
+-----------------------------------------------------------------
+Clase: Custom.HMS.JS.Pharmacy.Presc.Edit
+funcion: ValidateItemDuplicity() 
+
+*********************************************************************************************************************
+*                                            Funcion Agregada                                                     *
+*********************************************************************************************************************
+/* Mejora FM-0067 Feb 2023 [START]*/
+function ValidateItemDuplicity(){
+	var vid_message = ''
+	var vid_duplicates = ''
+	var vid_items = document.querySelectorAll('.tblList > tbody > tr > td[style=\'display:none;\']')
+	var vid_rowsID = ''
+	for (var vid_i = 0; i < vid_items.length; i++){
+		vid_rowsID += vid_items[i].children[0].value + '-' + vid_items[i].children[9].value + '^'
+	}
+	vid_message = 'Los siguientes Medicamentos se encuentran duplicados: \n\n'
+	vid_duplicates += tkMakeServerCall("Custom.HMS.Misc.web.OEOrdItem","GetRepeatedItemsForPharmacyAcceptance",vid_rowsID);
+	if(vid_duplicates !== ''){
+		alert(vid_message + vid_duplicates)
+	}
+}
+if (document.getElementById('CONTEXT').value == "W589SA") {
+	ValidateItemDuplicity()
+}
+/* Mejora FM-0067 [END]*/
+
+Pnediente > W589SA
+empacar >  W589SP
+entregar > W589SC

@@ -1,0 +1,102 @@
+https://intersystemscorporation-my.sharepoint.com/:v:/r/personal/jromectr_intersystems_com/Documents/Recordings/Mejora%20FM-0094-20230331_150641-Grabaci%C3%B3n%20de%20la%20reuni%C3%B3n.mp4?csf=1&web=1&e=hanb6i
+
+https://intersystemscorporation-my.sharepoint.com/:v:/r/personal/jromectr_intersystems_com/Documents/Recordings/Hosmil%20Reportes-20230413_115527-Grabaci%C3%B3n%20de%20la%20reuni%C3%B3n.mp4?csf=1&web=1&e=ARCoyT
+
+
+RB_OperatingRoom
+Class: websys.JS.RBOperatingRoom.ChangeStatus
+Method: UpdateClickHandler
+
+Fichas: 365898
+
+zw ^RBOP("75940")
+zw ^PAADM("3207273")
+
+
+Update Class Custom.HMS.JS.RBOperatingRoom.ChangeStatus
+-----------------------------------------------------
+Add the following code at the bottom:
+	/* Mejora FM-0096 ----> Inicio */
+	// 	Action over the button id="update1"
+	// Automatic Change Pre-Admision Episode status to"Suspended"[P] or "Canceled"[x] when the Schedual is canceled or suspended
+	function UpdateClickHandler(e) {
+		var objCancelReason= document.getElementById('SUSPDesc');
+		if ((objCancelReason)&&(objCancelReason.value=="")&&(objCancelReason.className == "clsRequired")) {
+			alert(t['CancelReasonMissing']);
+			return false;
+		}
+		var objNotReadyReason= document.getElementById('REANRDesc');
+		if ((objNotReadyReason)&&(objNotReadyReason.value=="")&&(objNotReadyReason.className == "clsRequired")) {
+			alert(t['NotReadyReasonMissing']);
+			return false;
+		}
+		var dateAObj=document.getElementById("RBOPDateArrived");
+		var timeAObj=document.getElementById("RBOPTimeArrived");
+		var cdateAObj=document.getElementById("cRBOPDateArrived");
+		var ctimeAObj=document.getElementById("cRBOPTimeArrived");
+		if ((dateAObj)&&(cdateAObj)&&(dateAObj.value=="")&&(cdateAObj.className == "clsRequired")) {
+			alert( t[dateAObj.id] + " " + t['XMISSING']);
+			return false;
+		}
+		if ((timeAObj)&&(ctimeAObj)&&(timeAObj.value=="")&&(ctimeAObj.className == "clsRequired")) {
+			alert( t[timeAObj.id] + " " + t['XMISSING']);
+			return false;
+		}
+		
+		var frm=document.forms['fRBOperatingRoom_ChangeStatus'];
+		var objNewStat= document.getElementById('NewStatus');
+		var objCurStat= document.getElementById('HCurrentStatus');
+		var objCancelEp= document.getElementById('CancelEpisodeFlag');
+		/* "When setting the Theatre Booking back to requested we will cancel the associated appointment.
+		Do you also want to cancel the associated episode? Ok will cancel episode. Cancel will not cancel epsode."
+		*/
+		if (objNewStat.value=="R" && objCurStat.value=="B") {
+			var cnfmsg=t["CancelEpisode"]
+			if (confirm(cnfmsg)) {
+				document.getElementById('NoCancel').value=0
+				if (frm) frm.TOVERRIDE.value=1;
+				objCancelEp.value="true"
+			} else {
+				document.getElementById('NoCancel').value=1
+				if (frm) frm.TOVERRIDE.value=1;
+				objCancelEp.value="false"
+			}
+		}
+		
+		/* FM-0096 Init*/
+		if(objNewStat.value ==="P" || objNewStat.value ==="X"){
+			if(!confirm('El cambio de estado que va a realizar tambien modificará el estado de la Pre-Amision al estado "Suspendido".\n\n ¿Desea continuar?'))return false
+			var oRBOP= document.getElementById('ID').value
+			tkMakeServerCall("Custom.HMS.Misc.web.RBOperatingRoom","ChangePreAdmissionStatusChage",oRBOP)
+		}
+		/* FM-0096 Fin*/
+		
+		return update1_click();
+	}
+	/* Mejora FM-0096 ----> Fin */
+
+
+
+
+Add: Class Custom.HMS.Misc.web.RBOperatingRoom
+-------------------------------------------------------
+Include EnsUtil
+
+Class Custom.HMS.Misc.web.RBOperatingRoom Extends %RegisteredObject [ Not ProcedureBlock ]
+{
+
+/// ////////////////////////////////////////////////////////////////
+/// Mejora FM-0096 (Abril 2023)
+/// Params: rbopID [ID of the operating room]
+/// /////////////////////////////////////////////////////////////////
+ClassMethod ChangePreAdmissionStatusChage(rbopID) As %String
+{
+		Set tSC = ""
+		Set episodeID = $Piece($Get(^RBOP(rbopID)),"^",10)
+		Set episodeActualStatus = $Piece($Get(^PAADM(episodeID)),"^",20)
+		If episodeActualStatus = "P" Set $piece(^PAADM(episodeID),"^",20)="C"
+		Set episodeActualStatus = $Piece($Get(^PAADM(episodeID)),"^",20)
+		Quit tSC
+}
+
+}

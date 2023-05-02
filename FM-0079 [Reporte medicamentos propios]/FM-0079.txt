@@ -1,0 +1,279 @@
+Se crearon las siguientes clases:
+------------------------------------------------------------------------------------------------------------------------------------------------------
+Class Custom.HMIL.Report.ZEN.Farmacia.spMedicamentosProprios Extends Report.Abstract [ ClassType = "", Not ProcedureBlock ]
+{
+
+/// This is where all the cleanup is performed, i.e. the purging of the temporary storage global ^CacheTemp.
+ClassMethod MainClose(QHandle As %Library.Binary) As %Library.Status
+{
+ // Clean up by purging the temporary node in ^CacheTemp global
+ New repid
+ Set repid = $li(QHandle,2)
+ //Start Monitor (if configured to capture stats)
+ i mon Do ..MonitorEnd(mon)
+ Kill ^CacheTemp("TRAK",repid)
+ Quit $$$OK
+}
+
+/// This is the Execute section for the %Library.Query. 
+/// All of the logic will be performed here.
+/// A new node for the ^CacheTemp global will be created and each subscript of this global will contain
+ClassMethod MainExecute(ByRef QHandle As %Library.Binary, FechaDesde As %Date, FechaHasta As %Date) As %Library.Status
+{
+ // Get reportid i.e. use $INCREMENT to add another node to ^CacheTemp global. 
+ // We use ^CacheTemp global because it will always use memory before disk
+ New repid, ind
+  
+ // Use $Increment to get the next node
+ Set repid = $I(^CacheTemp("TRAK"))
+
+ //Start Monitor (if configured to capture stats)
+ s mon=..MonitorBegin()
+  
+ Set ind = 1
+  
+ i FechaDesde>FechaHasta
+ {
+	s ^CacheTemp("TRAK",repid,ind)=$LB("")
+	Set QHandle=$LISTBUILD(0,repid,0)
+ 	Quit $$$OK
+ }
+ 
+  &sql(declare C1 cursor for
+  		select 
+    	OEORI_RowId 
+    	into :rowid 
+    	from sqluser.OE_OrdItem 
+		where  
+		OEORI_Date >= TO_DATE(:FechaDesde, 'YYYY-MM-DD') 
+		and OEORI_Date <= TO_DATE(:FechaHasta, 'YYYY-MM-DD') 
+		and (OEORI_ItmMast_DR = '36555||1' or OEORI_Priority_DR = '6') /* Solo medicacion propia */
+		order by OEORI_Date asc
+	)
+
+	&sql(open C1)
+		quit:(SQLCODE'=0)
+ 	&sql(fetch C1)
+ 	
+ 	set i = 1
+ 	while (SQLCODE = 0) {
+	 	//Comunes
+	 	Set tORD = $Piece(rowid,"||",1)
+	 	Set tITM = $Piece(rowid,"||",2)
+	 	Set OEORDAdmDR=$Piece($Get(^OEORD(tORD)),"^",1)
+	 	Set PAADMPAPMIDR=$Piece($Get(^PAADM(OEORDAdmDR)),"^",1)
+	 	Set OEORIItmMastDR=$Piece(^OEORD(tORD,"I",tITM,1),"^",2)
+	 	Set OEORDAdmDR=$Piece($Get(^OEORD(tORD)),"^",1)
+	 	//***********************************************************************
+	 	//Fecha Indicacion
+	 	Set FechaIndicacion = $ZDATE($Piece($Get(^OEORD(tORD,"I",tITM,3)),"^",7),4)
+	 	
+	 	//Ficha
+	 	Set (tRtMastId,tFicha) = ""
+		Set tRtMastId = $order(^RT(0,"PAT",PAADMPAPMIDR,""))
+		If tRtMastId '= ""
+		{
+			Set tFicha = $Piece(^RT(tRtMastId),"^",1)
+		}
+		
+		//Paciente
+		Set RutPaciente=$P($g(^PAPER(PAADMPAPMIDR,"ALL")),"^",9)	
+		Set Paterno=$P($g(^PAPER(PAADMPAPMIDR,"ALL")),"^",1)
+		Set Materno=$P($g(^PAPER(PAADMPAPMIDR,"ALL")),"^",19)
+		Set Nombre=$P($g(^PAPER(PAADMPAPMIDR,"ALL")),"^",2)
+	 	Set Paciente=Nombre_" "_Paterno_" "_Materno
+		
+		//Prioridad
+		Set PriorityCode = $Piece($Get(^OEORD(tORD,"I",tITM,1)),"^",8)
+		Set PriorityDesc = $Piece($Get(^OECPR(PriorityCode)),"^",2)
+		
+		//Farmaco
+		Set ARCIMSubscript=+OEORIItmMastDR	
+		Set ARCIMVersion=$Piece(OEORIItmMastDR,"||",2)
+		Set FarmacoCode=$Piece($Get(^ARCIM(ARCIMSubscript,ARCIMVersion,1)),"^",1)
+		Set Farmaco=$Piece($Get(^ARCIM(ARCIMSubscript,ARCIMVersion,1)),"^",2)
+	 	
+	 	//Nota de la Orden
+	 	Set orderNote = $Get(^OEORD(tORD,"I",tITM,"DEP",1))
+	 	
+	 	//Medico que prescribe
+	 	Set (MedicoPrescribe,RutMedicoPrescribe)=""
+					
+		Set OEORIDoctorDR=$Piece($Get(^OEORD(tORD,"I",tITM,1)),"^",11)
+		If OEORIDoctorDR'="" 
+		{
+			Set MedicoPrescribe=$Piece($Get(^CTPCP(OEORIDoctorDR,1)),"^",2)
+			Set RutMedicoPrescribe=$Piece($Get(^CTPCP(OEORIDoctorDR,1)),"^",1)
+		}
+		
+		//Locale que Solicita
+	 	Set LocalSol=""
+	 	If $EXTRACT($Piece($Get(^OEORD(tORD,"I",tITM,1)),"^",14),1)="O"
+		{ 
+			If OEORDAdmDR'="" Set PAADMDepCodeDR=$Piece($Get(^PAADM(OEORDAdmDR)),"^",4)
+			If $Get(PAADMDepCodeDR)'=""
+			{
+				Set LocalSol=$Piece($Get(^CTLOC(PAADMDepCodeDR)),"^",2)
+				Set HospitalId= $Piece($Get(^CTLOC(PAADMDepCodeDR)),"^",22)
+			}
+		}
+		else
+		{				
+			Set OEORIOrdDeptDR=$Piece($Get(^OEORD(tORD,"I",tITM,1)),"^",3)
+			If OEORIOrdDeptDR'=""
+			{
+				Set LocalSol=$Piece($Get(^CTLOC(OEORIOrdDeptDR)),"^",2)
+				Set HospitalId= $Piece($Get(^CTLOC(OEORIOrdDeptDR)),"^",22)
+			}
+		}
+		
+		//Local que recibe
+	 	Set LocalRec=""
+	 	Set OEORIRecDepDR = $Piece($Get(^OEORD(tORD,"I",tITM,3)),"^",6)
+	 	Set LocalRec = $Piece($Get(^CTLOC(OEORIRecDepDR)),"^",2)
+		
+		//Episodio
+		Set tNroEpisodio= ""
+		Set tNroEpisodio=$Piece($Get(^PAADM(OEORDAdmDR)),"^",81)
+		
+	 	//Set ^zOscarRondon($ZDATETIME($NOW()), 4, i, "DatosRep") = $LB(FechaIndicacion, tFicha, RutPaciente,  Paciente, PriorityDesc, FarmacoCode, Farmaco, orderNote, RutMedicoPrescribe, MedicoPrescribe, LocalSol, LocalRec, tNroEpisodio)
+	 	Set ^CacheTemp("TRAK",repid,ind)= $LB(
+	 		FechaIndicacion, 
+	 		tFicha, 
+	 		RutPaciente,  
+	 		Paciente, 
+	 		PriorityDesc, 
+	 		FarmacoCode, 
+	 		Farmaco, 
+	 		orderNote, 
+	 		RutMedicoPrescribe, 
+	 		MedicoPrescribe, 
+	 		LocalSol, 
+	 		LocalRec, 
+	 		tNroEpisodio
+	 		)	
+		Set ind=ind +1
+	 	Set i =  i + 1
+	 	&sql(fetch C1)
+ 	}
+    
+ 	&sql(close C1)
+ 	
+ 	If ind=1 Set ^CacheTemp("TRAK",repid,ind)=$LB("")
+
+	 // Build QHandle (AtEnd,ReportID,Index)
+	 Set QHandle=$LISTBUILD(0,repid,0)
+	 Quit $$$OK
+}
+
+/// This is the Fetch component of the %Library.Query. 
+/// This should never have to change. It is designed to fetch the row for each subscript of the ^CacheTemp
+/// global and return this row to the Crystal Report.
+ClassMethod MainFetch(ByRef QHandle As %Library.Binary, ByRef Row As %Library.List, ByRef AtEnd As %Library.Integer = 0) As %Library.Status
+{
+ // This fetch method should never have to change. 
+
+ // repid - Report ID
+ // ind   - sequence index which represents each row
+
+ New repid,ind
+
+ // Restore QHandle
+ Set AtEnd=$LI(QHandle,1)
+ Set repid=$LI(QHandle,2)
+ Set ind=$LI(QHandle,3)
+
+ Set ind=$order(^CacheTemp("TRAK",repid,ind))
+ If ind="" {	// if there are no more rows, finish fetching
+ 	Set AtEnd=1
+ 	Set Row=""
+ }  Else  {	// fetch row
+ 	Set Row=^CacheTemp("TRAK",repid,ind)
+ }
+
+ // Save QHandle
+ Set QHandle=$lb(AtEnd,repid,ind)
+ Quit $$$OK
+}
+
+/// This is the Stored Procedure Template. For Sample use only.
+/// It expects one parameter of type integer and will return 4 fields:
+/// Field1 - Integer
+/// Field2 - String
+/// Field3 - Date
+/// Field4 - Time
+Query Main(FechaDesde As %Date, FechaHasta As %Date) As %Library.Query(CONTAINID = 0, ROWSPEC = "FechaIndicacion, tFicha, RutPaciente, Paciente, PriorityDesc, FarmacoCode, Farmaco, orderNote, RutMedicoPrescribe, MedicoPrescribe, LocalSol, LocalRec, tNroEpisodio") [ SqlProc ]
+{
+}
+
+}
+------------------------------------------------------------------------------------------------------------------------------------------------------
+/// ***************************************************************************************************** 
+/// Informe que contiene el listado de medimacamentos recetados con prioridad Medicacion propia 
+/// o como item Medicamento Propio
+/// *****************************************************************************************************
+Class Custom.HMIL.Report.ZEN.Farmacia.MedicamentosProprios Extends Region.CLXX.Reports.ZEN.Abstract
+{
+
+// 
+
+Parameter USEINSTALLEDFOP = 0;
+
+Parameter APPLICATION;
+
+Parameter DEFAULTMODE = "xlsx";
+
+Property FechaDesde As %String(ZENURL = "P1");
+
+Property FechaHasta As %String(ZENURL = "P2");
+
+Property LogonLoc As %String [ InitialExpression = {%session.Get("LOGON.CTLOCID")} ];
+
+Property LogonUser As %String [ InitialExpression = {%session.Get("LOGON.USERNAME")} ];
+
+XData ReportDefinition [ XMLNamespace = "http://www.intersystems.com/zen/report/definition" ]
+{
+<report xmlns="http://www.intersystems.com/zen/report/definition"
+ name="MedicacionPropia" queryClass="Custom.HMIL.Report.ZEN.Farmacia.spMedicamentosProprios" queryName="Main">
+
+<parameter expression='..FechaDesde'/>
+<parameter expression='..FechaHasta'/>
+
+<group name="Main">
+
+<element field='FechaIndicacion' name='FechaIndicacion' excelName="Fecha Indicación"/>
+<element field='tFicha' name='tFicha' excelName="Ficha Paciente"/>
+<element field='RutPaciente' name='RutPaciente' excelName="RUN Paciente"/>
+<element field='Paciente' name='Paciente' excelName="Nombre Paciente"/>
+<element field='PriorityDesc' name='PriorityDesc' excelName="Prioridad"/>
+<element field='FarmacoCode' name='FarmacoCode' excelName="Código Fármaco"/>
+<element field='Farmaco' name='Farmaco' excelName="Descripción Fármaco"/>
+<element field='orderNote' name='orderNote' excelName="Nota de la Orden"/>
+<element field='RutMedicoPrescribe' name='RutMedicoPrescribe' excelName="RUN Medico Prescribe"/>
+<element field='MedicoPrescribe' name='MedicoPrescribe' excelName="Nombre Medico Prescribe"/>
+<element field='LocalSol' name='LocalSol' excelName="Local Solicitante"/>
+<element field='LocalRec' name='LocalRec' excelName="Local Receptor"/>
+<element field='tNroEpisodio' name='tNroEpisodio' excelName="Nro. Episodio"/>
+
+</group>
+
+
+</report>
+}
+
+/// This XML defines the display for this report.
+/// This is used to generate the XSLT stylesheets for both HTML and XSL-FO.
+XData ReportDisplay [ XMLNamespace = "http://www.intersystems.com/zen/report/display" ]
+{
+<report xmlns="http://www.intersystems.com/zen/report/display"
+ name="MediacionPropia" title="Medicacion Propia">
+</report>
+}
+
+Method %OnAfterReport() As %Status
+{
+	Do ##class(Region.CLXX.Reports.ZEN.Utils).SetAudit($this,%session)
+	Quit $$$OK
+}
+
+}

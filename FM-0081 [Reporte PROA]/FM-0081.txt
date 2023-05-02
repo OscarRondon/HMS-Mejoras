@@ -250,8 +250,9 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary) As %Library.Status
  
   &sql(declare OEOrdItems cursor for
 		select
-		OEORI_RowId
-    	into :rowid
+		OEORI_RowId,
+		OEORI_ItmMast_DR->ARCIM_PHCDF_DR->PHCDF_PHCD_ParRef->PHCD_PHCPO_DR->PHCPO_Desc
+    	into :rowid, :Vigilancia
 		from sqluser.OE_OrdItem 
 		where
 		OEORI_OEORD_ParRef->OEORD_Adm_DR->PAADM_VisitStatus = 'A'
@@ -287,6 +288,8 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary) As %Library.Status
 	 	Set PAADMPAPMIDR=$Piece($Get(^PAADM(OEORDAdmDR)),"^",1)
 	 	Set OEORIItmMastDR=$Piece(^OEORD(tORD,"I",tITM,1),"^",2)
 	 	Set OEORDAdmDR=$Piece($Get(^OEORD(tORD)),"^",1)
+	 	Set ARCIMSubscript=+OEORIItmMastDR	
+		Set ARCIMVersion=$Piece(OEORIItmMastDR,"||",2)
 	 	
 	 	//Ficha
 	 	Set (RtMastId, Ficha) = ""
@@ -343,8 +346,6 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary) As %Library.Status
 		}
 		
 		//Farmaco
-		Set ARCIMSubscript=+OEORIItmMastDR	
-		Set ARCIMVersion=$Piece(OEORIItmMastDR,"||",2)
 		Set FarmacoCode=$Piece($Get(^ARCIM(ARCIMSubscript,ARCIMVersion,1)),"^",1)
 		Set Farmaco=$Piece($Get(^ARCIM(ARCIMSubscript,ARCIMVersion,1)),"^",2)
 		
@@ -395,7 +396,8 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary) As %Library.Status
 	 		DiasDiff,
 	 		OEORIPrescNo,
 	 		pharmacyStatus,
-	 		NroEpisodio
+	 		NroEpisodio,
+	 		Vigilancia
 	 		)	
 		Set ind=ind +1
 	 	Set i =  i + 1
@@ -447,7 +449,7 @@ ClassMethod MainFetch(ByRef QHandle As %Library.Binary, ByRef Row As %Library.Li
 /// Field2 - String
 /// Field3 - Date
 /// Field4 - Time
-Query Main() As %Library.Query(CONTAINID = 0, ROWSPEC = "rowid, Ficha, RutPaciente, Paciente, LocalSol, Cama, FechaPrescripcion, RutMedicoPrescribe, MedicoPrescribe, FarmacoCode, Farmaco, Dosis, FITratamiento, FFTratamiento, DiasDiff, OEORIPrescNo, pharmacyStatus, NroEpisodio") [ SqlProc ]
+Query Main() As %Library.Query(CONTAINID = 0, ROWSPEC = "rowid, Ficha, RutPaciente, Paciente, LocalSol, Cama, FechaPrescripcion, RutMedicoPrescribe, MedicoPrescribe, FarmacoCode, Farmaco, Dosis, FITratamiento, FFTratamiento, DiasDiff, OEORIPrescNo, pharmacyStatus, NroEpisodio, Vigilancia") [ SqlProc ]
 {
 }
 

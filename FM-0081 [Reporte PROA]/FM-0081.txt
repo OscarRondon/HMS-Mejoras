@@ -225,7 +225,7 @@ ClassMethod MainClose(QHandle As %Library.Binary) As %Library.Status
 /// This is the Execute section for the %Library.Query. 
 /// All of the logic will be performed here.
 /// A new node for the ^CacheTemp global will be created and each subscript of this global will contain
-ClassMethod MainExecute(ByRef QHandle As %Library.Binary) As %Library.Status
+ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %String) As %Library.Status
 {
  // Get reportid i.e. use $INCREMENT to add another node to ^CacheTemp global. 
  // We use ^CacheTemp global because it will always use memory before disk
@@ -239,14 +239,7 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary) As %Library.Status
   
  Set ind = 1
  
- /* 
- i FechaDesde>FechaHasta
- {
-	s ^CacheTemp("TRAK",repid,ind)=$LB("")
-	Set QHandle=$LISTBUILD(0,repid,0)
- 	Quit $$$OK
- }
- */
+ Set ^zOscarRondon($ZDATETIME($NOW()), 1, "tipoVigilancia") = tipoVigilancia
  
   &sql(declare OEOrdItems cursor for
 		select
@@ -358,7 +351,8 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary) As %Library.Status
 		If OEORIFinDate="" Set OEORIFinDate=OEORISttDat
 		Set FITratamiento=$ZDate(OEORISttDat,4)
 		Set FFTratamiento=$ZDate(OEORIFinDate,4)
-		Set DiasDiff=FFTratamiento-FITratamiento
+		//Set DiasDiff=FFTratamiento-FITratamiento
+		Set DiasDiff=(OEORIFinDate-OEORISttDat)
 		If DiasDiff=0 Set DiasDiff=1
 		
 		//Precription Number
@@ -449,8 +443,85 @@ ClassMethod MainFetch(ByRef QHandle As %Library.Binary, ByRef Row As %Library.Li
 /// Field2 - String
 /// Field3 - Date
 /// Field4 - Time
-Query Main() As %Library.Query(CONTAINID = 0, ROWSPEC = "rowid, Ficha, RutPaciente, Paciente, LocalSol, Cama, FechaPrescripcion, RutMedicoPrescribe, MedicoPrescribe, FarmacoCode, Farmaco, Dosis, FITratamiento, FFTratamiento, DiasDiff, OEORIPrescNo, pharmacyStatus, NroEpisodio, Vigilancia") [ SqlProc ]
+Query Main(tipoVigilancia As %String) As %Library.Query(CONTAINID = 0, ROWSPEC = "rowid, Ficha, RutPaciente, Paciente, LocalSol, Cama, FechaPrescripcion, RutMedicoPrescribe, MedicoPrescribe, FarmacoCode, Farmaco, Dosis, FITratamiento, FFTratamiento, DiasDiff, OEORIPrescNo, pharmacyStatus, NroEpisodio, Vigilancia") [ SqlProc ]
 {
+}
+
+}
+
+
+Add Class Custom.HMIL.Report.ZEN.Farmacia.PROAExcel
+---------------------------------------------------------------
+/// ***************************************************************************************************** 
+/// Informe que contiene el listado de medimacamentos recetados y que son controlados para episodios
+/// de hospitalizados que se encuentran activos
+/// *****************************************************************************************************
+Class Custom.HMIL.Report.ZEN.Farmacia.PROAExcel Extends Region.CLXX.Reports.ZEN.Abstract
+{
+
+// 
+
+Parameter USEINSTALLEDFOP = 0;
+
+Parameter APPLICATION;
+
+Parameter DEFAULTMODE = "xlsx";
+
+Property tipoVigilancia As %String(ZENURL = "P1");
+
+// Property FechaHasta As %String(ZENURL = "P2");
+
+Property LogonLoc As %String [ InitialExpression = {%session.Get("LOGON.CTLOCID")} ];
+
+Property LogonUser As %String [ InitialExpression = {%session.Get("LOGON.USERNAME")} ];
+
+XData ReportDefinition [ XMLNamespace = "http://www.intersystems.com/zen/report/definition" ]
+{
+<report xmlns="http://www.intersystems.com/zen/report/definition"
+ name="PROA" queryClass="Custom.HMIL.Report.ZEN.Farmacia.spPROA" queryName="Main">
+
+<parameter expression='..tipoVigilancia'/>
+
+<group name="Main">
+
+<element field='Ficha' name='Ficha' excelName="Ficha paciente"/>
+<element field='RutPaciente' name='RutPaciente' excelName="RUN paciente"/>
+<element field='Paciente' name='Paciente' excelName="Nombre paciente"/>
+<element field='LocalSol' name='LocalSol' excelName="Servicio"/>
+<element field='Cama' name='Cama' excelName="Cama"/>
+<element field='FechaPrescripcion' name='FechaPrescripcion' excelName="Fecha prescripción"/>
+<element field='RutMedicoPrescribe' name='RutMedicoPrescribe' excelName="Rut médico prescribe"/>
+<element field='MedicoPrescribe' name='MedicoPrescribe' excelName="Médico prescribe"/>
+<element field='FarmacoCode' name='FarmacoCode' excelName="Codígo"/>
+<element field='Farmaco' name='Farmaco' excelName="Glosa"/>
+<element field='Dosis' name='Dosis' excelName="Dosis"/>
+<element field='FITratamiento' name='FITratamiento' excelName="Fecha inicio tratamiento"/>
+<element field='FFTratamiento' name='FFTratamiento' excelName="Fecha fin tratamiento"/>
+<element field='DiasDiff' name='DiasDiff' excelName="Días de tratamiento"/>
+<element field='OEORIPrescNo' name='OEORIPrescNo' excelName="Nro receta"/>
+<element field='pharmacyStatus' name='pharmacyStatus' excelName="Estado de farmacia"/>
+<element field='NroEpisodio' name='NroEpisodio' excelName="Episodio"/>
+<element field='Vigilancia' name='Vigilancia' excelName="Vigilancia"/>
+
+</group>
+
+
+</report>
+}
+
+/// This XML defines the display for this report.
+/// This is used to generate the XSLT stylesheets for both HTML and XSL-FO.
+XData ReportDisplay [ XMLNamespace = "http://www.intersystems.com/zen/report/display" ]
+{
+<report xmlns="http://www.intersystems.com/zen/report/display"
+ name="PROA" title="Reporte PROA">
+</report>
+}
+
+Method %OnAfterReport() As %Status
+{
+	Do ##class(Region.CLXX.Reports.ZEN.Utils).SetAudit($this,%session)
+	Quit $$$OK
 }
 
 }

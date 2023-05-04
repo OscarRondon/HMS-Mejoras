@@ -265,7 +265,8 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
 		'36097||1', '36098||1', '39794||1', '40290||1', '44741||1', '44742||1', '47469||1', '47487||1', '47511||1', 
 		'47954||1')
 		order by 
-		OEORI_OEORD_ParRef->OEORD_Adm_DR->PAADM_PersonResponsiblePayment->PAPER_ID
+		OEORI_OEORD_ParRef,
+		OEORI_ItmMast_DR->ARCIM_PHCDF_DR->PHCDF_PHCD_ParRef->PHCD_PHCPO_DR->PHCPO_Code
 		asc
 	)
 
@@ -378,6 +379,8 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
 	 		Ficha,
 	 		RutPaciente,
 	 		Paciente,
+	 		NroEpisodio,
+	 		Vigilancia,
 	 		LocalSol,
 	 		Cama,
 	 		FechaPrescripcion,
@@ -390,9 +393,7 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
 	 		FFTratamiento,
 	 		DiasDiff,
 	 		OEORIPrescNo,
-	 		pharmacyStatus,
-	 		NroEpisodio,
-	 		Vigilancia
+	 		pharmacyStatus
 	 		)	
 		Set ind=ind +1
 	 	Set i =  i + 1
@@ -444,11 +445,12 @@ ClassMethod MainFetch(ByRef QHandle As %Library.Binary, ByRef Row As %Library.Li
 /// Field2 - String
 /// Field3 - Date
 /// Field4 - Time
-Query Main(tipoVigilancia As %String) As %Library.Query(CONTAINID = 0, ROWSPEC = "rowid, Ficha, RutPaciente, Paciente, LocalSol, Cama, FechaPrescripcion, RutMedicoPrescribe, MedicoPrescribe, FarmacoCode, Farmaco, Dosis, FITratamiento, FFTratamiento, DiasDiff, OEORIPrescNo, pharmacyStatus, NroEpisodio, Vigilancia") [ SqlProc ]
+Query Main(tipoVigilancia As %String) As %Library.Query(CONTAINID = 0, ROWSPEC = "rowid, Ficha, RutPaciente, Paciente, NroEpisodio, Vigilancia, LocalSol, Cama, FechaPrescripcion, RutMedicoPrescribe, MedicoPrescribe, FarmacoCode, Farmaco, Dosis, FITratamiento, FFTratamiento, DiasDiff, OEORIPrescNo, pharmacyStatus") [ SqlProc ]
 {
 }
 
 }
+
 
 
 Add Class Custom.HMIL.Report.ZEN.Farmacia.PROAExcel

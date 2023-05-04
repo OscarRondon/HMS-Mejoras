@@ -239,7 +239,7 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
   
  Set ind = 1
  
- Set ^zOscarRondon($ZDATETIME($NOW()), 1, "tipoVigilancia") = tipoVigilancia
+ If tipoVigilancia = "TODOS" Set tipoVigilancia = " "
  
   &sql(declare OEOrdItems cursor for
 		select
@@ -250,6 +250,7 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
 		where
 		OEORI_OEORD_ParRef->OEORD_Adm_DR->PAADM_VisitStatus = 'A'
 		and OEORI_OEORD_ParRef->OEORD_Adm_DR->PAADM_ADMNo like 'H%'
+		and OEORI_ItmMast_DR->ARCIM_PHCDF_DR->PHCDF_PHCD_ParRef->PHCD_PHCPO_DR->PHCPO_Code like '%'_:tipoVigilancia_'%'
 		and OEORI_ItmMast_DR in ('14864||1', '14865||1', '18014||1', '24258||1', '24295||1', '24315||1', '24317||1', 
 		'24333||1', '24418||1', '24511||1', '24514||1', '24524||1', '24525||1', '24526||1', '24531||1', '24535||1', 
 		'24541||1', '24713||1', '34951||1', '34952||1', '34953||1', '34954||1', '34955||1', '34956||1', '34957||1', 

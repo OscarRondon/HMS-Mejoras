@@ -207,7 +207,7 @@ or ARCIM_Desc like '%Ganciclovir%'
 
 Add Class Custom.HMIL.Report.ZEN.Farmacia.spPROA
 --------------------------------------------------------------------
-Class Custom.HMIL.Report.ZEN.Farmacia.spPROA Extends Report.Abstract [ ClassType = "", Not ProcedureBlock ]
+CClass Custom.HMIL.Report.ZEN.Farmacia.spPROA Extends Report.Abstract [ ClassType = "", Not ProcedureBlock ]
 {
 
 /// This is where all the cleanup is performed, i.e. the purging of the temporary storage global ^CacheTemp.
@@ -266,7 +266,8 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
 		'47954||1')
 		order by 
 		OEORI_OEORD_ParRef,
-		OEORI_ItmMast_DR->ARCIM_PHCDF_DR->PHCDF_PHCD_ParRef->PHCD_PHCPO_DR->PHCPO_Code
+		OEORI_ItmMast_DR->ARCIM_PHCDF_DR->PHCDF_PHCD_ParRef->PHCD_PHCPO_DR->PHCPO_Code,
+		OEORI_ItmMast_DR
 		asc
 	)
 
@@ -451,8 +452,6 @@ Query Main(tipoVigilancia As %String) As %Library.Query(CONTAINID = 0, ROWSPEC =
 
 }
 
-
-
 Add Class Custom.HMIL.Report.ZEN.Farmacia.PROAExcel
 ---------------------------------------------------------------
 /// ***************************************************************************************************** 
@@ -526,5 +525,222 @@ Method %OnAfterReport() As %Status
 	Do ##class(Region.CLXX.Reports.ZEN.Utils).SetAudit($this,%session)
 	Quit $$$OK
 }
+
+}
+
+Add Class Custom.HMIL.Report.ZEN.Farmacia.PROApdf
+---------------------------------------------------------------
+Class Custom.HMIL.Report.ZEN.Farmacia.PROApdf Extends (Region.CLXX.Reports.ZEN.Abstract, Custom.HMIL.Report.ZEN.Abstract)
+{
+
+Parameter DEFAULTMODE = "html";
+
+Property tipoVigilancia As %String(ZENURL = "P1");
+
+Property HospitalId As %String [ InitialExpression = {%session.Get("LOGON.HOSPITALID")} ];
+
+Property LogonLoc As %String [ InitialExpression = {%session.Get("LOGON.CTLOCID")} ];
+
+Property LogonUser As %String [ InitialExpression = {%session.Get("LOGON.USERNAME")} ];
+
+Property ReportWidth As %ZEN.Datatype.string [ InitialExpression = "216mm" ];
+
+Property ReportHeight As %ZEN.Datatype.string [ InitialExpression = "279mm" ];
+
+XData ReportDefinition [ XMLNamespace = "http://www.intersystems.com/zen/report/definition" ]
+{
+<report xmlns="http://www.intersystems.com/zen/report/definition"
+ name="PROApdf" queryClass="Custom.HMIL.Report.ZEN.Farmacia.spPROA" queryName="Main">
+
+<parameter expression='..tipoVigilancia'/>
+
+<attribute name="LogonLoc"  expression="..LogonLoc"/>
+<attribute name="tipoVigilancia" expression='..tipoVigilancia'/>
+
+<attribute name='LogonHospDesc'  expression='..GetHospitalDesc(..LogonLoc)'/>
+<attribute name="LogonHealthCareArea"  expression='..GetHealthCareArea(..LogonLoc)'/>
+<attribute name="LogonLocDesc"  expression='..GetLocDesc(..LogonLoc)'/>
+<attribute name='LogonUser' expression='..LogonUser'/>
+<attribute name="CurrentDate" expression="$zd(+$h,4)"/>
+<attribute name="CurrentTime" expression='$zt($p($h,",",2),1)'/>
+
+<group name="Main" breakOnField="Ficha">
+
+<attribute field='Ficha' name='Ficha' />
+<element field='NroEpisodio' name='NroEpisodio' />
+<element field='RutPaciente' name='RutPaciente' />
+<element field='Paciente' name='Paciente' />
+
+<group name="tipoVigilancia" breakOnField="Vigilancia">
+
+<attribute field='Vigilancia' name='Vigilancia' />
+
+<group name="ItemDescription">
+
+<attribute field='rowid' name='rowid' />
+<element field='LocalSol' name='LocalSol' />
+<element field='Cama' name='Cama' />	
+<element field='FechaPrescripcion' name='FechaPrescripcion' />
+<element field='RutMedicoPrescribe' name='RutMedicoPrescribe' />
+<element field='MedicoPrescribe' name='MedicoPrescribe' />
+<element field='FarmacoCode' name='FarmacoCode' />
+<element field='Farmaco' name='Farmaco' />
+<element field='Dosis' name='Dosis' />
+<element field='FITratamiento' name='FITratamiento' />
+<element field='FFTratamiento' name='FFTratamiento' />
+<element field='DiasDiff' name='DiasDiff' />
+<element field='OEORIPrescNo' name='OEORIPrescNo' />
+<element field='pharmacyStatus' name='pharmacyStatus' />
+
+</group>
+
+</group>
+
+</group>
+
+</report>
+}
+
+/// This is used to generate the XSLT stylesheets for both HTML and XSL-FO.
+XData ReportDisplay [ XMLNamespace = "http://www.intersystems.com/zen/report/display" ]
+{
+<report xmlns="http://www.intersystems.com/zen/report/display" name="PROApdf">
+
+<document> 
+
+<class name="table.Formato">
+<att name="width" value="100%"/>
+<att name="font-family" value="Arial"/>
+</class>
+
+<class name="th.Formato">
+<att name="font-size" value="10pt"/>
+<att name="border-style" value="none"/>
+<att name="border-width" value="1px"/>
+</class>
+
+<class name="td.Formato">
+<att name="font-size" value="10pt"/>
+<att name="border-style" value="none"/>
+<att name="border-width" value="1px"/>
+</class>
+
+<class name="table.FormatoTabla">
+<att name="width" value="100%"/>
+<att name="font-family" value="Arial"/>
+</class>
+
+<class name="th.FormatoTabla">
+<att name="font-size" value="8pt"/>
+<att name="border-style" value="none"/>
+<att name="border-width" value="1px"/>
+<att name="text-align" value="center"/>
+</class>
+
+<class name="td.FormatoTabla">
+<att name="font-size" value="8pt"/>
+<att name="border-style" value="none"/>
+<att name="border-width" value="1px"/>
+<att name="text-align" value="center"/>
+</class>
+
+</document>
+
+<body>
+
+<html>
+  <write>
+    <![CDATA[ <script language="JavaScript">window.print();</script> ]]>
+  </write>
+</html>
+
+<group name="Main" pagebreak="true">
+
+<table class="Formato" orient='col'>
+<item value='Ejercito de Chile' width="50%" style="font-size:10pt"/>
+<item field='/PROApdf/@CurrentDate' style='text-align:Right;font-size:10pt' width="50%"/>
+</table>
+
+<table class="Formato" orient='col'>
+<item value='Comando de Salud' width="50%" style="font-size:10pt"/>
+<item field='/PROApdf/@CurrentTime' style='text-align:Right;font-size:10pt' width="50%" />
+</table>
+
+<table orient='col' width='100%' class='Formato'>
+<item  field='/PROApdf/@LogonHospDesc' width="100%" style="font-size:10pt"/>
+</table>
+
+<line pattern="empty" width="100%"/>
+
+<table class="Formato" orient='col'>
+<item value="REPORTE PROA" width='100%' style="text-align:center"/>
+</table>
+
+<line pattern="empty" width="100%"/>
+<line pattern="empty" width="100%"/>
+<line pattern="empty" width="100%"/>
+
+<table orient='col' class="Formato" width='100%' >
+<item value='N° de Ficha Clínica:' width='20%'/>
+<item field='@Ficha' width='15%'/>
+<item value='Episodio:' width='20%'/>
+<item field='NroEpisodio' width='45%'/>
+</table>
+
+<line pattern="empty" width="100%"/>
+
+<table orient='col' class="Formato" width='100%' style="text-align:left" >
+<item value='RUT:' width='20%' />
+<item field='RutPaciente' width='15%'/>
+<item value='Nombre Paciente:' width='20%' />
+<item field='Paciente' width='45%' />
+</table>
+
+<line pattern="empty" width="100%"/>
+
+<group name="tipoVigilancia">
+
+<item  field='@Vigilancia' width='100%' />
+
+<line pattern="empty" width="100%"/>
+
+<table  orient='col' class="FormatoTabla" width='100%' style="font-size: smaller;">
+<item value='Código' width='10%' />
+<item value='Descripción' width='50%'/>
+<item value='Dosis'  width='25%'/>
+<item value='Dias tratamiento'  width='15%'/>
+</table>
+
+<line pattern="empty" width="100%"/>
+
+<group name="ItemDescription">
+<table orient='col' class="FormatoTabla" width='100%' style="font-size: smaller;">
+<item  field='FarmacoCode' width='10%' />
+<item field='Farmaco' width='50%' style="text-align:left" />
+<item  field='Dosis' width='25%'/>
+<item  field='DiasDiff' width='15%'/>
+</table>
+</group>
+
+</group>
+
+<line pattern="empty" width="100%"/>
+
+
+</group>
+
+</body>
+
+ </report>
+}
+
+Method %OnAfterReport() As %Status
+{
+	Do ##class(Region.CLXX.Reports.ZEN.Utils).SetAudit($this,%session)
+	Quit $$$OK
+}
+
+/// Location and Revision of this file in Perforce (Auto-updating)
+Parameter SrcVer = "$Id$";
 
 }

@@ -207,7 +207,7 @@ or ARCIM_Desc like '%Ganciclovir%'
 
 Add Class Custom.HMIL.Report.ZEN.Farmacia.spPROA
 --------------------------------------------------------------------
-CClass Custom.HMIL.Report.ZEN.Farmacia.spPROA Extends Report.Abstract [ ClassType = "", Not ProcedureBlock ]
+Class Custom.HMIL.Report.ZEN.Farmacia.spPROA Extends Report.Abstract [ ClassType = "", Not ProcedureBlock ]
 {
 
 /// This is where all the cleanup is performed, i.e. the purging of the temporary storage global ^CacheTemp.
@@ -225,7 +225,7 @@ ClassMethod MainClose(QHandle As %Library.Binary) As %Library.Status
 /// This is the Execute section for the %Library.Query. 
 /// All of the logic will be performed here.
 /// A new node for the ^CacheTemp global will be created and each subscript of this global will contain
-ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %String) As %Library.Status
+ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %String, RutPaciente As %String) As %Library.Status
 {
  // Get reportid i.e. use $INCREMENT to add another node to ^CacheTemp global. 
  // We use ^CacheTemp global because it will always use memory before disk
@@ -238,7 +238,9 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
  s mon=..MonitorBegin()
   
  Set ind = 1
+
  
+ If RutPaciente = "" Set RutPaciente = " "
  If tipoVigilancia = "TODOS" Set tipoVigilancia = " "
  
   &sql(declare OEOrdItems cursor for
@@ -251,6 +253,7 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
 		OEORI_OEORD_ParRef->OEORD_Adm_DR->PAADM_VisitStatus = 'A'
 		and OEORI_OEORD_ParRef->OEORD_Adm_DR->PAADM_ADMNo like 'H%'
 		and OEORI_ItmMast_DR->ARCIM_PHCDF_DR->PHCDF_PHCD_ParRef->PHCD_PHCPO_DR->PHCPO_Code like '%'_:tipoVigilancia_'%'
+		and OEORI_OEORD_ParRef->OEORD_Adm_DR->PAADM_PAPMI_DR->PAPMI_PAPER_DR->PAPER_ID like '%'_:RutPaciente_'%'
 		and OEORI_ItmMast_DR in ('14864||1', '14865||1', '18014||1', '24258||1', '24295||1', '24315||1', '24317||1', 
 		'24333||1', '24418||1', '24511||1', '24514||1', '24524||1', '24525||1', '24526||1', '24531||1', '24535||1', 
 		'24541||1', '24713||1', '34951||1', '34952||1', '34953||1', '34954||1', '34955||1', '34956||1', '34957||1', 
@@ -265,7 +268,7 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
 		'36097||1', '36098||1', '39794||1', '40290||1', '44741||1', '44742||1', '47469||1', '47487||1', '47511||1', 
 		'47954||1')
 		order by 
-		OEORI_OEORD_ParRef,
+		OEORI_OEORD_ParRef->OEORD_Adm_DR->PAADM_PAPMI_DR->PAPMI_PAPER_DR->PAPER_ID,
 		OEORI_ItmMast_DR->ARCIM_PHCDF_DR->PHCDF_PHCD_ParRef->PHCD_PHCPO_DR->PHCPO_Code,
 		OEORI_ItmMast_DR
 		asc
@@ -446,11 +449,12 @@ ClassMethod MainFetch(ByRef QHandle As %Library.Binary, ByRef Row As %Library.Li
 /// Field2 - String
 /// Field3 - Date
 /// Field4 - Time
-Query Main(tipoVigilancia As %String) As %Library.Query(CONTAINID = 0, ROWSPEC = "rowid, Ficha, RutPaciente, Paciente, NroEpisodio, Vigilancia, LocalSol, Cama, FechaPrescripcion, RutMedicoPrescribe, MedicoPrescribe, FarmacoCode, Farmaco, Dosis, FITratamiento, FFTratamiento, DiasDiff, OEORIPrescNo, pharmacyStatus") [ SqlProc ]
+Query Main(tipoVigilancia As %String, RutPaciente As %String) As %Library.Query(CONTAINID = 0, ROWSPEC = "rowid, Ficha, RutPaciente, Paciente, NroEpisodio, Vigilancia, LocalSol, Cama, FechaPrescripcion, RutMedicoPrescribe, MedicoPrescribe, FarmacoCode, Farmaco, Dosis, FITratamiento, FFTratamiento, DiasDiff, OEORIPrescNo, pharmacyStatus") [ SqlProc ]
 {
 }
 
 }
+
 
 Add Class Custom.HMIL.Report.ZEN.Farmacia.PROAExcel
 ---------------------------------------------------------------
@@ -471,7 +475,7 @@ Parameter DEFAULTMODE = "xlsx";
 
 Property tipoVigilancia As %String(ZENURL = "P1");
 
-// Property FechaHasta As %String(ZENURL = "P2");
+Property RutPaciente As %String(ZENURL = "P2");
 
 Property LogonLoc As %String [ InitialExpression = {%session.Get("LOGON.CTLOCID")} ];
 
@@ -483,6 +487,7 @@ XData ReportDefinition [ XMLNamespace = "http://www.intersystems.com/zen/report/
  name="PROA" queryClass="Custom.HMIL.Report.ZEN.Farmacia.spPROA" queryName="Main">
 
 <parameter expression='..tipoVigilancia'/>
+<parameter expression='..RutPaciente'/>
 
 <group name="Main">
 
@@ -528,6 +533,7 @@ Method %OnAfterReport() As %Status
 
 }
 
+
 Add Class Custom.HMIL.Report.ZEN.Farmacia.PROApdf
 ---------------------------------------------------------------
 Class Custom.HMIL.Report.ZEN.Farmacia.PROApdf Extends (Region.CLXX.Reports.ZEN.Abstract, Custom.HMIL.Report.ZEN.Abstract)
@@ -536,6 +542,8 @@ Class Custom.HMIL.Report.ZEN.Farmacia.PROApdf Extends (Region.CLXX.Reports.ZEN.A
 Parameter DEFAULTMODE = "html";
 
 Property tipoVigilancia As %String(ZENURL = "P1");
+
+Property RutPaciente As %String(ZENURL = "P2");
 
 Property HospitalId As %String [ InitialExpression = {%session.Get("LOGON.HOSPITALID")} ];
 
@@ -553,6 +561,7 @@ XData ReportDefinition [ XMLNamespace = "http://www.intersystems.com/zen/report/
  name="PROApdf" queryClass="Custom.HMIL.Report.ZEN.Farmacia.spPROA" queryName="Main">
 
 <parameter expression='..tipoVigilancia'/>
+<parameter expression='..RutPaciente'/>
 
 <attribute name="LogonLoc"  expression="..LogonLoc"/>
 <attribute name="tipoVigilancia" expression='..tipoVigilancia'/>
@@ -575,22 +584,29 @@ XData ReportDefinition [ XMLNamespace = "http://www.intersystems.com/zen/report/
 
 <attribute field='Vigilancia' name='Vigilancia' />
 
-<group name="ItemDescription">
+<group name="Farmacos" breakOnField="FarmacoCode">
+
+<attribute field='FarmacoCode' name='FarmacoCode' />
+<element field='Farmaco' name='Farmaco' />
+
+<group name="ItemDetails">
 
 <attribute field='rowid' name='rowid' />
 <element field='LocalSol' name='LocalSol' />
-<element field='Cama' name='Cama' />	
+<element field='Cama' name='Cama' />
+<element field='OEORIPrescNo' name='OEORIPrescNo' />	
 <element field='FechaPrescripcion' name='FechaPrescripcion' />
 <element field='RutMedicoPrescribe' name='RutMedicoPrescribe' />
 <element field='MedicoPrescribe' name='MedicoPrescribe' />
-<element field='FarmacoCode' name='FarmacoCode' />
-<element field='Farmaco' name='Farmaco' />
-<element field='Dosis' name='Dosis' />
 <element field='FITratamiento' name='FITratamiento' />
 <element field='FFTratamiento' name='FFTratamiento' />
+<element field='Dosis' name='Dosis' />
 <element field='DiasDiff' name='DiasDiff' />
-<element field='OEORIPrescNo' name='OEORIPrescNo' />
 <element field='pharmacyStatus' name='pharmacyStatus' />
+
+</group>
+
+<aggregate name='TotalDias' type='SUM' field='DiasDiff' />
 
 </group>
 
@@ -703,23 +719,55 @@ XData ReportDisplay [ XMLNamespace = "http://www.intersystems.com/zen/report/dis
 <item  field='@Vigilancia' width='100%' />
 
 <line pattern="empty" width="100%"/>
-
-<table  orient='col' class="FormatoTabla" width='100%' style="font-size: smaller;">
-<item value='Código' width='10%' />
-<item value='Descripción' width='50%'/>
-<item value='Dosis'  width='25%'/>
-<item value='Dias tratamiento'  width='15%'/>
-</table>
-
 <line pattern="empty" width="100%"/>
 
-<group name="ItemDescription">
-<table orient='col' class="FormatoTabla" width='100%' style="font-size: smaller;">
-<item  field='FarmacoCode' width='10%' />
-<item field='Farmaco' width='50%' style="text-align:left" />
-<item  field='Dosis' width='25%'/>
-<item  field='DiasDiff' width='15%'/>
+<group name="Farmacos">
+
+<table  orient='col' class="FormatoTabla" width='100%' style='text-align:left'>
+<item value='Código: ' width='6%' />
+<item  field='@FarmacoCode' width='5%' />
+<item value=' - ' width='2%'/>
+<item  field='Farmaco' width='75%' style='text-align:left' />
+<item value=' Total dias (' width='8%'/>
+<item  field='TotalDias' width='2%' />
+<item value=')' width='2%'/>
 </table>
+<table  orient='col' class="FormatoTabla" width='100%' style="text-align:left">
+<item value='____________________________________________________________________________________________________________________________' width='100%' style='text-align:left'/>
+</table>
+<line pattern="empty" width="100%"/>
+<table  orient='col' class="FormatoTabla" width='100%'>
+<item value='Solicitante' width='10%' style='font-size: 8pt'/>
+<item value='Cama' width='5%' style='font-size: 8pt'/>
+<item value='No. presc.'  width='10%' style='font-size: 8pt'/>
+<item value='Fecha presc.'  width='10%' style='font-size: 8pt'/>
+<item value='Rut médico'  width='10%' style='font-size: 8pt'/>
+<item value='Médico'  width='10%' style='font-size: 8pt'/>
+<item value='Fecha Inicio Tratamiento'  width='10%' style='font-size: 8pt'/>
+<item value='Fecha Fin Tratamiento'  width='10%' style='font-size: 8pt'/>
+<item value='Dosis'  width='10%' style='font-size: 8pt'/>
+<item value='Dias'  width='5%' style='font-size: 8pt'/>
+<item value='Estatus farmacia'  width='10%' style='font-size: 8pt'/>
+</table>
+<line pattern="empty" width="100%"/>
+
+<group name="ItemDetails">
+<table orient='col' class="FormatoTabla" width='100%'>
+<item  field='LocalSol' width='10%' style='font-size: 8pt'/>
+<item  field='Cama' width='5%' style='font-size: 8pt'/>
+<item  field='OEORIPrescNo' width='10%' style='font-size: 8pt'/>
+<item  field='FechaPrescripcion' width='10%' style='font-size: 8pt'/>
+<item  field='RutMedicoPrescribe' width='10%' style='font-size: 8pt'/>
+<item  field='MedicoPrescribe' width='10%' style='font-size: 8pt'/>
+<item  field='FITratamiento' width='10%' style='font-size: 8pt'/>
+<item  field='FFTratamiento' width='10%' style='font-size: 8pt'/>
+<item  field='Dosis' width='10%' style='font-size: 8pt'/>
+<item  field='DiasDiff' width='5%' style='font-size: 8pt'/>
+<item  field='pharmacyStatus' width='10%' style='font-size: 8pt'/>
+</table>
+</group>
+<line pattern="empty" width="100%"/>
+
 </group>
 
 </group>

@@ -359,7 +359,7 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
 		Set FFTratamiento=$ZDate(OEORIFinDate,4)
 		//Set DiasDiff=FFTratamiento-FITratamiento
 		Set DiasDiff=(OEORIFinDate-OEORISttDat)
-		If DiasDiff=0 Set DiasDiff=1
+		Set DiasDiff=DiasDiff + 1
 		
 		//Precription Number
 		Set OEORIPrescNo = $Piece($Get(^OEORD(tORD,"I",tITM,1)),"^",14)

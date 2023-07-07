@@ -1,4 +1,4 @@
-Clase de extraccion de datos
+Clase de extraccion de datos:
 ----------------------------------------------------
 Class Custom.HMIL.Report.ZEN.Farmacia.spMedicamentosValidados Extends Report.Abstract [ ClassType = "", Not ProcedureBlock ]
 {

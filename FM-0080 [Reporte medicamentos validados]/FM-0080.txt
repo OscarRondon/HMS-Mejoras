@@ -1,0 +1,370 @@
+Clase de extraccion de datos
+----------------------------------------------------
+Class Custom.HMIL.Report.ZEN.Farmacia.spMedicamentosValidados Extends Report.Abstract [ ClassType = "", Not ProcedureBlock ]
+{
+
+/// This is where all the cleanup is performed, i.e. the purging of the temporary storage global ^CacheTemp.
+ClassMethod MainClose(QHandle As %Library.Binary) As %Library.Status
+{
+ // Clean up by purging the temporary node in ^CacheTemp global
+ New repid
+ Set repid = $li(QHandle,2)
+ //Start Monitor (if configured to capture stats)
+ i mon Do ..MonitorEnd(mon)
+ Kill ^CacheTemp("TRAK",repid)
+ Quit $$$OK
+}
+
+/// This is the Execute section for the %Library.Query. 
+/// All of the logic will be performed here.
+/// A new node for the ^CacheTemp global will be created and each subscript of this global will contain
+ClassMethod MainExecute(ByRef QHandle As %Library.Binary, HospitalId As %String, LocalId As %String, FechaDesde As %Date, FechaHasta As %Date) As %Library.Status
+{
+ // Get reportid i.e. use $INCREMENT to add another node to ^CacheTemp global. 
+ // We use ^CacheTemp global because it will always use memory before disk
+
+ New repid, ind
+  
+ // Use $Increment to get the next node
+ Set repid = $I(^CacheTemp("TRAK"))
+
+ //Start Monitor (if configured to capture stats)
+ Set mon=..MonitorBegin()
+  
+ Set ind = 1
+ 
+ Set FechaDesde=..ConvertDateToCache(FechaDesde)
+ Set FechaHasta=..ConvertDateToCache(FechaHasta)
+ 
+ Set Fecha=FechaDesde-1
+ 
+ for
+ {
+	 Set Fecha=$o(^OEORDi(0,"RadSt",LocalId,Fecha))
+	 If Fecha="" q
+	 If Fecha>FechaHasta q
+	 Set OEORIItemStatDR=""
+ 	 for
+ 	 {
+	 	 Set OEORIItemStatDR=$o(^OEORDi(0,"RadSt",LocalId,Fecha,OEORIItemStatDR))	 	 
+	 	 If OEORIItemStatDR="" q
+ 		 Set OEORDRowId=""
+ 		 for
+ 		 {
+	 		 Set OEORDRowId=$o(^OEORDi(0,"RadSt",LocalId,Fecha,OEORIItemStatDR,OEORDRowId))	 		 
+	 		 
+	 		 If OEORDRowId="" q
+	 		 
+	 		 Set OEORIChildsub=0
+	 		 for
+	 		 {
+		 		 Set OEORIChildsub=$o(^OEORDi(0, "RadSt",LocalId,Fecha,OEORIItemStatDR,OEORDRowId,OEORIChildsub))
+				 s LocalReceptor = $p($g(^CTLOC(LocalId)),"^",2)
+				 If OEORIChildsub="" q
+				 Set tItemPharmacyState = ""
+				 Set tItemPharmacyState = $$pharmst^COEOrdItem6(OEORDRowId_"||"_OEORIChildsub)
+				 
+				 If tItemPharmacyState ="P" continue
+				 s EstadoF = tItemPharmacyState
+				 s EstadoConsultado=""		
+				 i EstadoF = "A" s EstadoConsultado="Aceptado"
+				 i EstadoF = "M" s EstadoConsultado="Envasado"
+				 i EstadoF = "C" s EstadoConsultado="Despachado"
+				 i EstadoF = "O" s EstadoConsultado="Finalizado"
+				 i EstadoF = "J" s EstadoConsultado="Retornado"
+				 i EstadoF = "R" s EstadoConsultado="Rechazado"
+				
+				 s tItemPharmacyState = EstadoConsultado				 
+			
+				 Set OEORIUserUpdate = ..GetAuditDetails(OEORDRowId_"||"_OEORIChildsub)
+								
+				 If '$data(^OEORD(OEORDRowId,"I",OEORIChildsub)) continue
+					s OEORIPriorityDR= $p(^OEORD(OEORDRowId,"I",OEORIChildsub,1),"^",8)	
+					s OECPRDesc = $p(^OECPR(OEORIPriorityDR),"^",2)
+					
+					
+					Set OEORIItmMastDR=$p(^OEORD(OEORDRowId,"I",OEORIChildsub,1),"^",2)
+					s ^zDa($I(^zDa),"OEORIItmMastDR")= OEORIItmMastDR
+					Set ARCIMSubscript=$p(OEORIItmMastDR,"||",1)					
+ 					Set ARCIMVersion=$p(OEORIItmMastDR,"||",2)
+ 					
+					Set ARCIMPHCDFDR=$p($g(^ARCIM(ARCIMSubscript,ARCIMVersion,1)),"^",12)
+					
+		 			If ARCIMPHCDFDR="" continue
+		 			
+		 			Set OEORISttTim=$p($g(^OEORD(OEORDRowId,"I",OEORIChildsub,1)),"^",10)
+							
+					Set OEORDAdmDR=$p($g(^OEORD(OEORDRowId)),"^",1)
+	 			
+	 				Set PAADMType=$p($g(^PAADM(OEORDAdmDR)),"^",2)
+	 			
+	 				Set PAADMPAPMIDR=$p($g(^PAADM(OEORDAdmDR)),"^",1)
+					
+					Set tNroEpisodio= ""
+					Set tNroEpisodio=$p($g(^PAADM(OEORDAdmDR)),"^",81)
+					
+					Set NumReceta=$p($g(^OEORD(OEORDRowId,"I",OEORIChildsub,1)),"^",14)
+					
+					Set Farmaco=$p($g(^ARCIM(ARCIMSubscript,ARCIMVersion,1)),"^",2)
+					//
+					
+					s Prescripcion=""
+					
+					s Dosis=$p($g(^OEORD(OEORDRowId,"I",OEORIChildsub,2)),"^",1)
+									
+					s UOMIndicada=""
+					s OEORIUnitDR=$p($g(^OEORD(OEORDRowId,"I",OEORIChildsub,2)),"^",3)
+					i OEORIUnitDR'="" 
+					{
+					s UOMIndicada=$p($g(^CT("UOM",OEORIUnitDR)),"^",2)
+					}
+					
+					s Frecuencia=""
+					s OEORIPHFreqDR=$p($g(^OEORD(OEORDRowId,"I",OEORIChildsub,2)),"^",4)
+					i OEORIPHFreqDR'="" s Frecuencia=$p($g(^PHCFR(OEORIPHFreqDR)),"^",3)
+			
+								
+					s ViaAdm=""
+					s OEORIAdminRouteDR=$p($g(^OEORD(OEORDRowId,"I",OEORIChildsub,12)),"^",7)
+					i OEORIAdminRouteDR'="" s ViaAdm=$p($g(^PHC("ADMR",OEORIAdminRouteDR)),"^",2)
+				
+					
+					s DuracionT=""
+					s PHCDUFactor=0
+					
+					s OEORIDuratDR=$p($g(^OEORD(OEORDRowId,"I",OEORIChildsub,2)),"^",6)
+					
+					i OEORIDuratDR'=""
+					{
+						s DuracionT=$p($g(^PHCDU(OEORIDuratDR)),"^",3)
+						s PHCDUFactor=$p($g(^PHCDU(OEORIDuratDR)),"^",2)
+						
+					}
+					
+					s Prescripcion=Dosis_" "_UOMIndicada_" "_Frecuencia_ " " _ DuracionT	
+					
+					Set UOMIndicada=""
+					Set OEORIUnitDR=$p($g(^OEORD(OEORDRowId,"I",OEORIChildsub,2)),"^",3)  	
+										
+					Set (tStockItemId,tUOMStock)=""
+					set tStockItemId = $order(^INCI(0,"ARCIM_DR",+OEORIItmMastDR,""))
+					if tStockItemId '= "" set tUOMStock = $piece(^CT("UOM",$piece(^INCI(tStockItemId,1),"^",10)),"^",2)
+					
+				
+					Set Cantidad=$p($g(^OEORD(OEORDRowId,"I",OEORIChildsub,1)),"^",12)
+	   		
+	   				Set ARCIMPHCDFDR=$p($g(^ARCIM(ARCIMSubscript,ARCIMVersion,1)),"^",12)
+					
+         			Set CantSolicit=$$calcqty^aOET7(ARCIMPHCDFDR,OEORIUnitDR,Cantidad)
+         			s CantSolicitada = CantSolicit _" " _ tUOMStock         			
+    	
+					Set RutPaciente=$P($g(^PAPER(PAADMPAPMIDR,"ALL")),"^",9)	
+		   			Set Paterno=$P($g(^PAPER(PAADMPAPMIDR,"ALL")),"^",1)
+		   			Set Materno=$P($g(^PAPER(PAADMPAPMIDR,"ALL")),"^",19)
+		   			Set Nombre=$P($g(^PAPER(PAADMPAPMIDR,"ALL")),"^",2)
+	 		
+	 				Set Paciente=Nombre_" "_Paterno_" "_Materno
+					
+					Set (tRtMastId,tFicha) = ""
+					Set tRtMastId = $order(^RT(0,"PAT",PAADMPAPMIDR,""))
+					If tRtMastId '= ""
+					{
+						Set tFicha = $piece(^RT(tRtMastId),"^",1)
+					}
+			
+					Set (MedicoPrescribe,RutMedicoPrescribe)=""
+					
+					Set OEORIDoctorDR=$p($g(^OEORD(OEORDRowId,"I",OEORIChildsub,1)),"^",11)
+					If OEORIDoctorDR'="" 
+					{
+						s MedicoPrescribe=$p($g(^CTPCP(OEORIDoctorDR,1)),"^",2)
+						s RutMedicoPrescribe=$p($g(^CTPCP(OEORIDoctorDR,1)),"^",1)
+					}
+
+					Set FechaIndicacion=""
+					If Fecha'="" s FechaIndicacion=$zd(Fecha,4,,4)
+					
+					Set HoraIndicacion=""
+					If OEORISttTim'="" s HoraIndicacion=$zt(OEORISttTim,2)
+					
+					If PAADMType="O" s TipoEpisodio="Ambulatorio"
+					If PAADMType="I" s TipoEpisodio="Hospitalizado"
+					If PAADMType="E" s TipoEpisodio="Urgencia"
+					
+					If OEORIUserUpdate = "" Set OEORIUserUpdate = MedicoPrescribe
+					
+					Set ^CacheTemp("TRAK",repid,ind)=$LB(OEORIUserUpdate,
+					tItemPharmacyState,
+					FechaIndicacion,
+					HoraIndicacion,
+					Paciente,
+					RutPaciente,
+					MedicoPrescribe,
+					RutMedicoPrescribe,
+					TipoEpisodio,
+					LocalReceptor,
+					tNroEpisodio,tFicha,
+					NumReceta,
+					OECPRDesc,
+					Farmaco,
+					CantSolicitada,
+					Prescripcion)
+			
+					Set ind=ind +1
+					
+	 			}
+ 			}
+ 		}
+ 	}
+ 	
+
+	 // Build QHandle (AtEnd,ReportID,Index)
+	 i ind=1 s ^CacheTemp("TRAK",repid,ind)=$LB("")
+	 Set QHandle=$LISTBUILD(0,repid,0)
+	 Quit $$$OK
+}
+
+/// This is the Fetch component of the %Library.Query. 
+/// This should never have to change. It is designed to fetch the row for each subscript of the ^CacheTemp
+/// global and return this row to the Crystal Report.
+ClassMethod MainFetch(ByRef QHandle As %Library.Binary, ByRef Row As %Library.List, ByRef AtEnd As %Library.Integer = 0) As %Library.Status
+{
+ // This fetch method should never have to change. 
+
+ // repid - Report ID
+ // ind   - sequence index which represents each row
+
+ New repid,ind
+
+ // Restore QHandle
+ Set AtEnd=$LI(QHandle,1)
+ Set repid=$LI(QHandle,2)
+ Set ind=$LI(QHandle,3)
+
+ Set ind=$order(^CacheTemp("TRAK",repid,ind))
+ If ind="" {	// if there are no more rows, finish fetching
+ 	Set AtEnd=1
+ 	Set Row=""
+ }  Else  {	// fetch row
+ 	Set Row=^CacheTemp("TRAK",repid,ind)
+ }
+
+ // Save QHandle
+ Set QHandle=$lb(AtEnd,repid,ind)
+ Quit $$$OK
+}
+
+/// This is the Stored Procedure Template. For Sample use only.
+/// It expects one parameter of type integer and will return 4 fields:
+/// Field1 - Integer
+/// Field2 - String
+/// Field3 - Date
+/// Field4 - Date
+Query Main(HospitalId As %String, LocalId As %String, FechaDesde As %Date, FechaHasta As %Date) As %Library.Query(CONTAINID = 0, ROWSPEC = "FarmaceuticoValidador,Estado,FechaIndicacion,HoraIndicacion,Paciente,RutPaciente,MedicoPrescribe,RutMedicoPrescribe,TipoEpisodio,LocalReceptor,tNroEpisodio,tFicha,NumReceta,Prioridad,Farmaco,CantSolicitada,Prescripcion") [ SqlProc ]
+{
+}
+
+ClassMethod GetAuditDetails(RowId As %String) As %String
+{
+	
+	Set (SSUSRName)=""
+	&SQL(
+ 	SELECT 
+		FLD_ParRef->AUD_User_DR->SSUSR_Name
+		INTO SSUSRName
+	FROM SQLUser.SS_AuditTrailFields
+	WHERE (FLD_ParRef->AUD_Table = 'OE_OrdItem')
+		AND (FLD_ParRef->AUD_TableRowId = :RowId)
+		AND (FLD_FieldNo = 'OEORI_PharmacyStatus')
+		AND (FLD_Value = 'A')
+		AND (FLD_ParRef->AUD_Date IS NOT NULL)
+	ORDER BY FLD_ParRef->AUD_Date ASC, FLD_ParRef->AUD_Time ASC
+ )
+ QUIT SSUSRName
+}
+
+/// Location and Revision of this file in Perforce (Auto-updating)
+Parameter SrcVer = "$Id$";
+
+}
+
+
+Clase de presentacion
+--------------------------------------
+Class Custom.HMIL.Report.ZEN.Farmacia.MedicamentosValidados Extends Region.CLXX.Reports.ZEN.Abstract
+{
+
+// 
+
+Parameter USEINSTALLEDFOP = 0;
+
+Parameter APPLICATION;
+
+Parameter DEFAULTMODE = "xlsx";
+
+Property Hospital As %String(ZENURL = "P1");
+
+Property Local As %String(ZENURL = "P2");
+
+Property FechaDesde As %String(ZENURL = "P3");
+
+Property FechaHasta As %String(ZENURL = "P4");
+
+Property LogonLoc As %String [ InitialExpression = {%session.Get("LOGON.CTLOCID")} ];
+
+Property LogonUser As %String [ InitialExpression = {%session.Get("LOGON.USERNAME")} ];
+
+XData ReportDefinition [ XMLNamespace = "http://www.intersystems.com/zen/report/definition" ]
+{
+<report xmlns="http://www.intersystems.com/zen/report/definition"
+ name="MedicamentosValidados" queryClass="Custom.HMIL.Report.ZEN.Farmacia.spMedicamentosValidados" queryName="Main">
+
+<parameter expression='..Hospital'/>
+<parameter expression='..Local'/>
+<parameter expression='..FechaDesde'/>
+<parameter expression='..FechaHasta'/>
+
+<group name="Main">
+
+
+<element field='FechaIndicacion'		name = 'FechaIndicacion'		excelName="Fecha Indicacion"/>
+<element field='tFicha'		name = 'tFicha'					excelName="Ficha Paciente"/>
+<element field='Paciente'		name = 'Paciente'				excelName="Nombre Paciente"/>
+<element field='NumReceta'		name = 'NumReceta'				excelName="N° Receta"/>
+<element field='tNroEpisodio'		name = 'tNroEpisodio'			excelName="N° Episodio"/>
+<element field='TipoEpisodio'		name = 'TipoEpisodio'			excelName="TipoEpisodio"/>
+<element field='Prioridad'		name = 'Prioridad'				excelName="Prioridad"/>
+<element field='Farmaco'		name = 'Farmaco'				excelName="Item Farmaco"/>
+<element field='Prescripcion'		name = 'Prescripcion'			excelName="Cantidad Prescrita"/>
+<element field='CantSolicitada'		name = 'Cantidad'			excelName="Cantidad Validada"/>
+<element field='MedicoPrescribe'		name = 'MedicoPrescribe'		excelName="Medico Prescribe"/>
+<element field='LocalReceptor'		name = 'LocalReceptor'		excelName="Local receptor"/>
+<element field='FarmaceuticoValidador'		name = 'OEORIUserUpdate'		excelName="Farmaceutico Validador"/>
+
+
+
+</group>
+
+
+</report>
+}
+
+/// This XML defines the display for this report.
+/// This is used to generate the XSLT stylesheets for both HTML and XSL-FO.
+XData ReportDisplay [ XMLNamespace = "http://www.intersystems.com/zen/report/display" ]
+{
+<report xmlns="http://www.intersystems.com/zen/report/display"
+ name="MedicamentosValidados" title="Medicamentos Validados">
+</report>
+}
+
+Method %OnAfterReport() As %Status
+{
+	Do ##class(Region.CLXX.Reports.ZEN.Utils).SetAudit($this,%session)
+	Quit $$$OK
+}
+
+/// Location and Revision of this file in Perforce (Auto-updating)
+Parameter SrcVer = "$Id$";
+
+}

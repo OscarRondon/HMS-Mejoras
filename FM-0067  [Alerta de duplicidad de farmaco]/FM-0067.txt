@@ -52,19 +52,57 @@ ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
  		set i = 1
  		Set itsOnlyPending = "Y"
  		s EstadoConsultado=""
+ 		
+ 		Set ArrayOfStatus("Pendiente") = 0
+ 		Set ArrayOfStatus("Aceptado") = 0
+ 		Set ArrayOfStatus("Envasado") = 0
+ 		Set ArrayOfStatus("Despachado") = 0
+ 		Set ArrayOfStatus("Finalizado") = 0
+ 		Set ArrayOfStatus("Retornado") = 0
+ 		Set ArrayOfStatus("Rechazado") = 0
+ 		
  		while (SQLCODE = 0) {
 	 		Set rowPharmacyStatus = $$pharmst^COEOrdItem6(rowid)
 	 		if rowPharmacyStatus '= "P" 
 	 		{
 		 		Set itsOnlyPending = "N"
-				i rowPharmacyStatus = "P" s EstadoConsultado="Pendiente"
-				i rowPharmacyStatus = "A" s EstadoConsultado="Aceptado"
-				i rowPharmacyStatus = "M" s EstadoConsultado="Envasado"
-				i rowPharmacyStatus = "C" s EstadoConsultado="Despachado"
-				i rowPharmacyStatus = "O" s EstadoConsultado="Finalizado"
-				i rowPharmacyStatus = "J" s EstadoConsultado="Retornado"
-				i rowPharmacyStatus = "R" s EstadoConsultado="Rechazado"
-		 		Quit
+				i rowPharmacyStatus = "P" 
+				{
+					s EstadoConsultado="Pendiente"
+					Set ArrayOfStatus("Pendiente") = ArrayOfStatus("Pendiente") + 1
+				}
+				i rowPharmacyStatus = "A" 
+				{
+					s EstadoConsultado="Aceptado"
+					Set ArrayOfStatus("Aceptado") = ArrayOfStatus("Aceptado") + 1
+				}
+				i rowPharmacyStatus = "M" 
+				{
+					s EstadoConsultado="Envasado"
+					Set ArrayOfStatus("Envasado") = ArrayOfStatus("Envasado") + 1
+				}
+				i rowPharmacyStatus = "C" 
+				{
+					s EstadoConsultado="Despachado"
+					Set ArrayOfStatus("Despachado") = ArrayOfStatus("Despachado") + 1
+				}
+				i rowPharmacyStatus = "O" 
+				{
+					s EstadoConsultado="Finalizado"
+					Set ArrayOfStatus("Finalizado") = ArrayOfStatus("Finalizado") + 1
+				}
+				i rowPharmacyStatus = "J" 
+				{
+					s EstadoConsultado="Retornado"
+					Set ArrayOfStatus("Retornado") = ArrayOfStatus("Retornado") + 1
+				}
+				i rowPharmacyStatus = "R" 
+				{
+					s EstadoConsultado="Rechazado"
+					Set ArrayOfStatus("Rechazado") = ArrayOfStatus("Rechazado") + 1
+				}
+		 		
+		 		//Quit
 	 		}
 	 		Set i =  i + 1
 	 		&sql(fetch C1)
@@ -76,6 +114,18 @@ ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
 	   	set isDuplicated = $ListFind(listOfItems, listOfItemsNewNode)
 	   	if isDuplicated > 0
 	   	{
+		   	Set EstadoConsultado = ""
+		   	
+		   	If ArrayOfStatus("Pendiente") > 0 Set EstadoConsultado = EstadoConsultado_"Pendiente: "_ArrayOfStatus("Pendiente")_"; "
+ 			If ArrayOfStatus("Aceptado") > 0 Set EstadoConsultado = EstadoConsultado_"Aceptado: "_ArrayOfStatus("Aceptado")_"; "
+ 			If ArrayOfStatus("Envasado") > 0 Set EstadoConsultado = EstadoConsultado_"Envasado: "_ArrayOfStatus("Envasado")_"; "
+ 			If ArrayOfStatus("Despachado") > 0 Set EstadoConsultado = EstadoConsultado_"Despachado: "_ArrayOfStatus("Despachado")_"; "
+ 			If ArrayOfStatus("Finalizado") > 0 Set EstadoConsultado = EstadoConsultado_"Finalizado: "_ArrayOfStatus("Finalizado")_" "
+ 			If ArrayOfStatus("Retornado") > 0 Set EstadoConsultado = EstadoConsultado_"Retornado: "_ArrayOfStatus("Retornado")_"; "
+ 			If ArrayOfStatus("Rechazado") > 0 Set EstadoConsultado = EstadoConsultado_"Rechazado: "_ArrayOfStatus("Rechazado")_"; "
+ 			
+ 			Set EstadoConsultado = $Extract(EstadoConsultado, 0, *-2)
+		   	
 		   	if $Find(tSC, $piece(value,"-",2)) = 0 Set tSC = tSC_"● "_$piece(value,"-",2)_" ("_EstadoConsultado_")"_$CHAR(10)
 	   	}
 	   	else
@@ -83,8 +133,10 @@ ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
 		   	Set $List(listOfItems,*+1) = listOfItemsNewNode
 	   	}
    	}
+   	//1988112-1
 	Quit tSC
 }
+
 -----------------------------------------------------------------
 Clase: Custom.HMS.JS.Pharmacy.Presc.Edit
 funcion: ValidateItemDuplicity() 

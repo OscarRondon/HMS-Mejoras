@@ -13,7 +13,7 @@ Metodo: ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %Integer
 *                                            Funcion Agregada                                                     *
 *********************************************************************************************************************
 /// ////////////////////////////////////////////////////////////////
-/// Mejora FM-0067 (Feb 2023)
+/// Mejora FM-0067 (Agust 2023)
 /// /////////////////////////////////////////////////////////////////
 ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
 {
@@ -21,6 +21,7 @@ ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
 	Set listRowsID = $LISTFROMSTRING($EXTRACT(rowsID,0, *-1),"^")
 	Set listOfItems = $ListBuild()
 	Set ptr=0
+	Set j = 1
    	While $LISTNEXT(listRowsID,ptr,value) {
 	   	Set listNode = $piece(value,"-",1)
 	   	Set episode = $piece(listNode,"||",1)
@@ -33,6 +34,7 @@ ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
 	   	Set recipeDate = $Piece(^OEORD(episode,"I",row,1),"^",9)
 	   	Set recipeDateFormated = $ZDATE(recipeDate,3)
 	   	Set listOfItemsNewNode = itemID_"^"_recipeDate
+	   	
 	   	
 	   	&sql(declare C1 cursor for
 	   		select 
@@ -62,43 +64,45 @@ ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
  		Set ArrayOfStatus("Rechazado") = 0
  		
  		while (SQLCODE = 0) {
+	 		
 	 		Set rowPharmacyStatus = $$pharmst^COEOrdItem6(rowid)
+	 		
 	 		if rowPharmacyStatus '= "P" 
 	 		{
 		 		Set itsOnlyPending = "N"
 				i rowPharmacyStatus = "P" 
 				{
-					s EstadoConsultado="Pendiente"
+					//s EstadoConsultado="Pendiente"
 					Set ArrayOfStatus("Pendiente") = ArrayOfStatus("Pendiente") + 1
 				}
 				i rowPharmacyStatus = "A" 
 				{
-					s EstadoConsultado="Aceptado"
+					//s EstadoConsultado="Aceptado"
 					Set ArrayOfStatus("Aceptado") = ArrayOfStatus("Aceptado") + 1
 				}
 				i rowPharmacyStatus = "M" 
 				{
-					s EstadoConsultado="Envasado"
+					//s EstadoConsultado="Envasado"
 					Set ArrayOfStatus("Envasado") = ArrayOfStatus("Envasado") + 1
 				}
 				i rowPharmacyStatus = "C" 
 				{
-					s EstadoConsultado="Despachado"
+					//s EstadoConsultado="Despachado"
 					Set ArrayOfStatus("Despachado") = ArrayOfStatus("Despachado") + 1
 				}
 				i rowPharmacyStatus = "O" 
 				{
-					s EstadoConsultado="Finalizado"
+					//s EstadoConsultado="Finalizado"
 					Set ArrayOfStatus("Finalizado") = ArrayOfStatus("Finalizado") + 1
 				}
 				i rowPharmacyStatus = "J" 
 				{
-					s EstadoConsultado="Retornado"
+					//s EstadoConsultado="Retornado"
 					Set ArrayOfStatus("Retornado") = ArrayOfStatus("Retornado") + 1
 				}
 				i rowPharmacyStatus = "R" 
 				{
-					s EstadoConsultado="Rechazado"
+					//s EstadoConsultado="Rechazado"
 					Set ArrayOfStatus("Rechazado") = ArrayOfStatus("Rechazado") + 1
 				}
 		 		
@@ -112,6 +116,7 @@ ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
 	   	if itsOnlyPending = "N" Set $List(listOfItems,*+1) = listOfItemsNewNode
 	   	
 	   	set isDuplicated = $ListFind(listOfItems, listOfItemsNewNode)
+	   	
 	   	if isDuplicated > 0
 	   	{
 		   	Set EstadoConsultado = ""
@@ -125,6 +130,8 @@ ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
  			If ArrayOfStatus("Rechazado") > 0 Set EstadoConsultado = EstadoConsultado_"Rechazado: "_ArrayOfStatus("Rechazado")_"; "
  			
  			Set EstadoConsultado = $Extract(EstadoConsultado, 0, *-2)
+ 			
+		   	If EstadoConsultado = "" Set EstadoConsultado = ("Duplicado en misma receta")
 		   	
 		   	if $Find(tSC, $piece(value,"-",2)) = 0 Set tSC = tSC_"● "_$piece(value,"-",2)_" ("_EstadoConsultado_")"_$CHAR(10)
 	   	}
@@ -132,6 +139,8 @@ ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
 	   	{
 		   	Set $List(listOfItems,*+1) = listOfItemsNewNode
 	   	}
+	   	
+	   	Set j = j + 1
    	}
    	//1988112-1
 	Quit tSC

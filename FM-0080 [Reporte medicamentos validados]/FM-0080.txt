@@ -63,8 +63,12 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, HospitalId As %String,
 				 If OEORIChildsub="" q
 				 Set tItemPharmacyState = ""
 				 Set tItemPharmacyState = $$pharmst^COEOrdItem6(OEORDRowId_"||"_OEORIChildsub)
+				 Set OEORIItemStatDR = $p(^OEORD(OEORDRowId,"I",OEORIChildsub,1),"^",13)
 				 
+				 if OEORIItemStatDR = 4 continue
 				 If tItemPharmacyState ="P" continue
+				 If tItemPharmacyState ="R" continue
+				 
 				 s EstadoF = tItemPharmacyState
 				 s EstadoConsultado=""		
 				 i EstadoF = "A" s EstadoConsultado="Aceptado"
@@ -74,10 +78,10 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, HospitalId As %String,
 				 i EstadoF = "J" s EstadoConsultado="Retornado"
 				 i EstadoF = "R" s EstadoConsultado="Rechazado"
 				
-				 s tItemPharmacyState = EstadoConsultado				 
-			
+				 s tItemPharmacyState = EstadoConsultado
+				 				 
 				 Set OEORIUserUpdate = ..GetAuditDetails(OEORDRowId_"||"_OEORIChildsub)
-								
+				 				
 				 If '$data(^OEORD(OEORDRowId,"I",OEORIChildsub)) continue
 					s OEORIPriorityDR= $p(^OEORD(OEORDRowId,"I",OEORIChildsub,1),"^",8)	
 					s OECPRDesc = $p(^OECPR(OEORIPriorityDR),"^",2)
@@ -191,8 +195,6 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, HospitalId As %String,
 					If PAADMType="I" s TipoEpisodio="Hospitalizado"
 					If PAADMType="E" s TipoEpisodio="Urgencia"
 					
-					If OEORIUserUpdate = "" Set OEORIUserUpdate = MedicoPrescribe
-					
 					Set ^CacheTemp("TRAK",repid,ind)=$LB(OEORIUserUpdate,
 					tItemPharmacyState,
 					FechaIndicacion,
@@ -266,7 +268,6 @@ Query Main(HospitalId As %String, LocalId As %String, FechaDesde As %Date, Fecha
 
 ClassMethod GetAuditDetails(RowId As %String) As %String
 {
-	
 	Set (SSUSRName)=""
 	&SQL(
  	SELECT 
@@ -287,6 +288,7 @@ ClassMethod GetAuditDetails(RowId As %String) As %String
 Parameter SrcVer = "$Id$";
 
 }
+
 
 
 Clase de presentacion

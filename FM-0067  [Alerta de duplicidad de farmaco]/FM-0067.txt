@@ -133,7 +133,7 @@ ClassMethod GetRepeatedItemsForPharmacyAcceptance(rowsID) As %String
  			
 		   	If EstadoConsultado = "" Set EstadoConsultado = ("Duplicado en misma receta")
 		   	
-		   	if $Find(tSC, $piece(value,"-",2)) = 0 Set tSC = tSC_"● "_$piece(value,"-",2)_" ("_EstadoConsultado_")"_$CHAR(10)
+		   	if $Find(tSC, $piece(value,"~*~",2)) = 0 Set tSC = tSC_"● "_$piece(value,"~*~",2)_" ("_EstadoConsultado_")"_$CHAR(10)
 	   	}
 	   	else
 	   	{
@@ -160,7 +160,7 @@ function ValidateItemDuplicity(){
 	var vid_items = document.querySelectorAll('.tblList > tbody > tr > td[style=\'display:none;\']')
 	var vid_rowsID = ''
 	for (var vid_i = 0; i < vid_items.length; i++){
-		vid_rowsID += vid_items[i].children[0].value + '-' + vid_items[i].children[9].value + '^'
+		vid_rowsID += vid_items[i].children[0].value + '~*~' + vid_items[i].children[9].value + '^'
 	}
 	vid_message = 'Los siguientes Medicamentos se encuentran duplicados: \n\n'
 	vid_duplicates += tkMakeServerCall("Custom.HMS.Misc.web.OEOrdItem","GetRepeatedItemsForPharmacyAcceptance",vid_rowsID);

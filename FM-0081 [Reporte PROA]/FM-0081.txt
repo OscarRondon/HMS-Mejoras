@@ -266,7 +266,8 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
 		'35251||1', '35252||1', '35271||1', '36611||1', '37658||1', '39677||1', '39698||1', '40281||1', '40479||1', 
 		'47441||1', '47680||1', '49623||1', '49938||1', '50763||1', '24514||1', '35011||1', '35223||1', '35312||1', 
 		'36097||1', '36098||1', '39794||1', '40290||1', '44741||1', '44742||1', '47469||1', '47487||1', '47511||1', 
-		'47954||1')
+		'47954||1', '36488||1')
+		and OEORI_PharmacyStatus not in ('P', 'R')
 		order by 
 		OEORI_OEORD_ParRef->OEORD_Adm_DR->PAADM_PAPMI_DR->PAPMI_PAPER_DR->PAPER_ID,
 		OEORI_ItmMast_DR->ARCIM_PHCDF_DR->PHCDF_PHCD_ParRef->PHCD_PHCPO_DR->PHCPO_Code,
@@ -280,6 +281,17 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
  	
  	set i = 1
  	while (SQLCODE = 0) {
+		
+		//Estado de Farmacia
+		Set rowPharmacyStatus = $$pharmst^COEOrdItem6(rowid)
+		If rowPharmacyStatus = "P" Set pharmacyStatus="Pendiente"
+		If rowPharmacyStatus = "A" Set pharmacyStatus="Aceptado"
+		If rowPharmacyStatus = "M" Set pharmacyStatus="Envasado"
+		If rowPharmacyStatus = "C" Set pharmacyStatus="Despachado"
+		If rowPharmacyStatus = "O" Set pharmacyStatus="Finalizado"
+		If rowPharmacyStatus = "J" Set pharmacyStatus="Retornado"
+		If rowPharmacyStatus = "R" Set pharmacyStatus="Rechazado"
+		
 	 	//Comunes
 	 	Set tORD = $Piece(rowid,"||",1)
 	 	Set tITM = $Piece(rowid,"||",2)
@@ -289,6 +301,7 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
 	 	Set OEORDAdmDR=$Piece($Get(^OEORD(tORD)),"^",1)
 	 	Set ARCIMSubscript=+OEORIItmMastDR	
 		Set ARCIMVersion=$Piece(OEORIItmMastDR,"||",2)
+		
 	 	
 	 	//Ficha
 	 	Set (RtMastId, Ficha) = ""
@@ -363,16 +376,6 @@ ClassMethod MainExecute(ByRef QHandle As %Library.Binary, tipoVigilancia As %Str
 		
 		//Precription Number
 		Set OEORIPrescNo = $Piece($Get(^OEORD(tORD,"I",tITM,1)),"^",14)
-		
-		//Estado de Farmacia
-		Set rowPharmacyStatus = $$pharmst^COEOrdItem6(rowid)
-		If rowPharmacyStatus = "P" Set pharmacyStatus="Pendiente"
-		If rowPharmacyStatus = "A" Set pharmacyStatus="Aceptado"
-		If rowPharmacyStatus = "M" Set pharmacyStatus="Envasado"
-		If rowPharmacyStatus = "C" Set pharmacyStatus="Despachado"
-		If rowPharmacyStatus = "O" Set pharmacyStatus="Finalizado"
-		If rowPharmacyStatus = "J" Set pharmacyStatus="Retornado"
-		If rowPharmacyStatus = "R" Set pharmacyStatus="Rechazado"
 		
 		//Episodio
 		Set NroEpisodio= ""
@@ -454,6 +457,7 @@ Query Main(tipoVigilancia As %String, RutPaciente As %String) As %Library.Query(
 }
 
 }
+
 
 
 Add Class Custom.HMIL.Report.ZEN.Farmacia.PROAExcel
